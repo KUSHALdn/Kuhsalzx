@@ -1,88 +1,88 @@
 import asyncio
-import os
-import aiohttp
+import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from motor.motor_asyncio import AsyncIOMotorClient
-from aiohttp import web
-from datetime import datetime
+from aiogram.types import BotCommand
 
-# ========================================================
-# KUSHAL PREMIUM CONFIG - BAS YE EK BAAR EDIT KARO
-# ========================================================
-TOKEN = "8878551213:AAEuXkfq8ZLkBZYZ7umIhrePCWKyinJObDw"
-MONGO_URI = "mongodb+srv://Elevenyts:Elevenyts@cluster0.vuyc1u2.mongodb.net/?retryWrites=true&w=majority"
-# ========================================================
+# --- Yahan apna Token daalo ---
+TOKEN = "8921575955:AAF8z-GI9xffH-j7E0LV2ai8xEcS36cCcmY"
+# ------------------------------
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-db = AsyncIOMotorClient(MONGO_URI)['kushal_premium_db']
+logging.basicConfig(level=logging.INFO)
 
-# --- Web Server (24/7 Keeping) ---
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get('/', lambda r: web.Response(text="Kushal Premium Bot Running!"))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    await web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 8080))).start()
+user_db = {}
 
-# --- Helpers ---
-def is_luhn_valid(cc):
-    digits = [int(d) for d in str(cc) if d.isdigit()]
-    return sum(digits[::-2] + [sum(divmod(2 * d, 10)) for d in digits[-2::-2]]) % 10 == 0
+async def set_main_menu(bot: Bot):
+    commands = [
+        BotCommand(command="start", description="Welcome & About"),
+        BotCommand(command="generate", description="Create new email"),
+        BotCommand(command="id", description="View account stats"),
+        BotCommand(command="delete", description="Delete active email"),
+        BotCommand(command="transfer", description="Transfer data")
+    ]
+    await bot.set_my_commands(commands)
 
-async def get_bin_info(bin_code):
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(f"https://lookup.binlist.net/{bin_code}") as resp:
-                if resp.status == 200: return await resp.json()
-        except: return None
-    return None
-
-# --- Commands ---
 @dp.message(Command("start"))
-async def welcome(message: types.Message):
-    user = message.from_user
-    mention = f"[{user.full_name}](tg://user?id={user.id})"
-    text = (f"🔥 **WELCOME TO KUSHAL PREMIUM CC CHECKER** 🔥\n\n"
-            f"👤 User: {mention}\n"
-            f"🆔 ID: `{user.id}`\n\n"
-            f"Command: `.chk [cc|mm|yy|cvv]`")
-    
-    photos = await bot.get_user_profile_photos(user.id, limit=1)
-    if photos.total_count > 0:
-        await bot.send_photo(message.chat.id, photos.photos[0][0].file_id, caption=text, parse_mode="Markdown")
-    else:
-        await message.answer(text, parse_mode="Markdown")
+async def start_cmd(message: types.Message):
+    welcome_text = (
+        "✨ *Welcome to KUSHAL MAIL BOT* ✨\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "✅ *Trusted & Secure Service*\n"
+        "🛡️ *100% Privacy (No Data Leaks)*\n"
+        "⚡ *24/7 Active Infrastructure*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "Thanks for joining the most secure mail platform. "
+        "We ensure your privacy is top-tier. Your data stays safe.\n\n"
+        "🚀 *Commands:*\n"
+        "/generate - Create email\n"
+        "/id - Check your stats\n"
+        "/delete - Clear active email\n"
+        "/transfer - Migrate account\n\n"
+        "🙏 *Thanks for your support!*"
+    )
+    await message.answer(welcome_text, parse_mode="Markdown")
 
-@dp.message(F.text.startswith(".chk"))
-async def check_cc(message: types.Message):
-    args = message.text.split()
-    if len(args) < 2: return await message.reply("❌ Format: `.chk cc|mm|yy|cvv`")
+@dp.message(Command("generate"))
+async def generate_cmd(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in user_db:
+        user_db[user_id] = {"count": 0, "active_mail": None}
     
-    cc = args[1].split('|')[0]
-    bin_info = await get_bin_info(cc[:6])
+    user_db[user_id]["count"] += 1
+    email = f"kushal_{user_id}_{user_db[user_id]['count']}@kushalmail.com"
+    user_db[user_id]["active_mail"] = email
     
-    status = "Approved ✅" if is_luhn_valid(cc) else "Declined ❌"
-    bank = bin_info.get('bank', {}).get('name', 'Unknown') if bin_info else "Unknown"
-    country = bin_info.get('country', {}).get('name', 'Unknown') if bin_info else "Unknown"
-    brand = bin_info.get('brand', 'Unknown') if bin_info else "Unknown"
-    
-    result = (f"✨ **KUSHAL CC RESULT** ✨\n"
-              f"━━━━━━━━━━━━━━━━━━\n"
-              f"💳 **CARD:** `{cc}`\n"
-              f"📡 **STATUS:** {status}\n"
-              f"🏦 **BANK:** {bank}\n"
-              f"🌍 **COUNTRY:** {country}\n"
-              f"🏷 **TYPE:** {brand}\n"
-              f"━━━━━━━━━━━━━━━━━━\n"
-              f"👤 **CHECKED BY:** {message.from_user.full_name}\n"
-              f"🆔 **USER ID:** `{message.from_user.id}`\n"
-              f"⏰ **TIME:** {datetime.now().strftime('%H:%M:%S')}")
-    await message.reply(result, parse_mode="Markdown")
+    await message.answer(f"✅ *Email Ready for All Platforms*:\n\n`{email}`\n\nWaiting for OTP/Code...", parse_mode="Markdown")
+
+@dp.message(Command("id"))
+async def id_cmd(message: types.Message):
+    user_id = message.from_user.id
+    data = user_db.get(user_id, {"count": 0, "active_mail": "None"})
+    await message.answer(
+        f"👤 *Account Statistics*\n\n"
+        f"📊 Total Emails Generated: `{data['count']}`\n"
+        f"📧 Current Active Mail: `{data['active_mail']}`", 
+        parse_mode="Markdown"
+    )
+
+@dp.message(Command("delete"))
+async def delete_cmd(message: types.Message):
+    user_id = message.from_user.id
+    if user_id in user_db and user_db[user_id]["active_mail"]:
+        user_db[user_id]["active_mail"] = None
+        await message.answer("🗑️ *Active email deleted successfully.*")
+    else:
+        await message.answer("❌ *No active email found to delete.*")
+
+@dp.message(Command("transfer"))
+async def transfer_cmd(message: types.Message):
+    await message.answer("🔄 *Migration System*\n\nEnter your migration code to sync your history.")
 
 async def main():
-    await start_web_server()
+    await set_main_menu(bot)
+    logging.info("Kushal Bot is online...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
